@@ -220,7 +220,7 @@
 
   watch(
     role,
-    (newValue: string, oldValue: any) => {
+    (newValue: string) => {
       if (newValue === 'admin') {
         treeData.value = copyRouter;
       } else {
