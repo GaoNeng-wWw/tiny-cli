@@ -10,7 +10,7 @@ export type I18nTranslations = {
             "unauth": string;
             "tokenError": string;
             "tokenExpire": string;
-            "forbidoen": string;
+            "forbidden": string;
         };
         "user": {
             "oldPasswordError": string;
@@ -34,6 +34,7 @@ export type I18nTranslations = {
             "notExists": string;
             "exists": string;
             "notExistsCommon": string;
+            "DELETE_LANG_CONFLICT": string;
         };
         "i18": {
             "exists": string;

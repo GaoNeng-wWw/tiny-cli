@@ -19,6 +19,7 @@
       </template>
       <tiny-layout class="layout-content">
         <Tabs
+          :key="tabsRefreshKey"
           v-model="currentTabName"
           with-close
           @click="onClick"
@@ -79,6 +80,7 @@
     Modal as tinyModal,
     Tabs,
     TabItem,
+    Modal,
   } from '@opentiny/vue';
   import TinyThemeTool from '@opentiny/vue-theme/theme-tool.js';
   import { useAppStore, useTabStore } from '@/store';
@@ -89,7 +91,9 @@
   import Menu from '@/components/menu/index.vue';
   import { useRouter } from 'vue-router';
   import { useTheme } from '@/hooks/useTheme';
+  import locale from '@opentiny/vue-locale';
   import PageLayout from './page-layout.vue';
+
   // 动态切换
   const router = useRouter();
   const appStore = useAppStore();
@@ -108,6 +112,7 @@
       reloadKey.value = '';
     });
   };
+  const tabsRefreshKey = ref('');
   provide('RELOAD', {
     reloadMenu,
   });
@@ -121,15 +126,71 @@
   );
 
   const onClick = (tab: { name: string; link: string }) => {
-    router.replace(tab.name);
+    const routePaths = router.getRoutes().map((routeItem) => routeItem.path);
+    if (!routePaths.includes(tab.name)) {
+      Modal.message({
+        message: locale.t('exception.result.404.description'),
+        status: 'error',
+      });
+      const curName = tabStore.delByLink(tab.name);
+      tabStore.set(curName);
+      tabStore.$patch({
+        current: tabStore.getByName(curName)[0],
+      });
+      currentTabName.value = tabStore.current?.link;
+      tabsRefreshKey.value = '1';
+      nextTick(() => {
+        tabsRefreshKey.value = '';
+      });
+    } else {
+      router.replace(tab.name);
+    }
   };
   const onClose = (name: string) => {
-    const curName = tabStore.delByLink(name);
-    if (curName) {
-      tabStore.set(curName);
-      const { link } = tabStore.getByName(curName)[0];
-      router.push({ path: link });
+    if (tabStore.data.length === 1) {
+      return;
     }
+    const routerPaths = router.getRoutes().map((r) => r.path);
+    const deleteItemIndex = tabStore.data.findIndex(
+      (item) => item.link === name,
+    );
+    let rightIdx = deleteItemIndex + 1;
+    let leftIdx = deleteItemIndex - 1;
+    let path = '';
+    const deleteSelf = tabStore.data[deleteItemIndex] === tabStore.current;
+    if (!deleteSelf) {
+      tabStore.delByLink(name);
+      return;
+    }
+    let curName = '';
+    // 向右找到一个最近的路由项
+    while (rightIdx < tabStore.data.length && !path) {
+      const item = tabStore.data[rightIdx];
+      if (routerPaths.includes(item.link)) {
+        path = item.link;
+        curName = item.name;
+        break;
+      }
+      rightIdx += 1;
+    }
+    // 向左找到一个最近的路由
+    while (leftIdx >= 0 && !path) {
+      const item = tabStore.data[leftIdx];
+      if (routerPaths.includes(item.link)) {
+        path = item.link;
+        curName = item.name;
+        break;
+      }
+      leftIdx -= 1;
+    }
+    // 找不到存在的路由则不删除当前路由也不跳转
+    if (leftIdx < 0 && rightIdx >= tabStore.data.length && !path) {
+      return;
+    }
+    tabStore.delByLink(name);
+    // 跳转到最近的一个合法路由
+    tabStore.set(curName);
+    router.push({ path });
   };
 
   // 切换简约模式，图标按钮

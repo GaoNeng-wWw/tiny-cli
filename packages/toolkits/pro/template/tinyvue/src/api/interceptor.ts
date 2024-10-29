@@ -54,22 +54,22 @@ axios.interceptors.response.use(
   },
   (error) => {
     const { status, data } = error.response;
-    if (status === 401) {
-      clearToken();
-      router.replace({ name: 'login' });
-      Modal.message({
-        message: locale.t('http.error.TokenExpire'),
-        status: 'error',
-      });
-    }
-    if (status === 403) {
+    if (status === 403 && error.config.method.toLowerCase() === 'get') {
       Modal.message({
         message: data.message,
         status: 'error',
       });
     }
+    if (status === 401) {
+      Modal.message({
+        message: locale.t('http.error.TokenExpire'),
+        status: 'error',
+      });
+      clearToken();
+      router.replace({ name: 'login' });
+    }
     if (status === 400) {
-      data.message = error.response.data.errors[0] ?? data.message;
+      data.message = error.response.data.errors?.[0] ?? data.message;
     }
 
     return Promise.reject(error);

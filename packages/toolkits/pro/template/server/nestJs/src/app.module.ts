@@ -15,7 +15,7 @@ import { AuthGuard } from './auth/auth.guard';
 import { PermissionGuard } from './permission/permission.guard';
 import { RoleModule } from './role/role.module';
 import { join } from 'path';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { UserService } from './user/user.service';
 import { RoleService } from './role/role.service';
 import { PermissionService } from './permission/permission.service';
@@ -77,7 +77,11 @@ export class AppModule implements OnModuleInit {
   ) {}
   async onModuleInit() {
     const ROOT = __dirname;
-    const LOCK_FILE = join(ROOT, 'lock');
+    const data = join(ROOT, 'data');
+    if (!existsSync(data)) {
+      mkdirSync(data);
+    }
+    const LOCK_FILE = join(data, 'lock');
     if (existsSync(LOCK_FILE)) {
       Logger.warn(
         'Lock file exists, if you want init agin, please remove dist or dist/lock'
@@ -105,9 +109,14 @@ export class AppModule implements OnModuleInit {
         Logger.log(`${name} - ${key} save success`);
       }
     }
-    // // TODO: permission
-    const modules = ['user', 'permission', 'role', 'menu', 'i18n', 'lang'];
-    const actions = ['add', 'remove', 'update', 'query'];
+    const permissions = {
+      user: ['add', 'remove', 'update', 'query', 'password::force-update'],
+      permission: ['add', 'remove', 'update', 'get'],
+      role: ['add', 'remove', 'update', 'query'],
+      menu: ['add', 'remove', 'update', 'query'],
+      i18n: ['add', 'remove', 'update', 'query'],
+      lang: ['add', 'remove', 'update', 'query'],
+    };
     const tasks = [];
     let permission;
     const isInit = true;
@@ -125,7 +134,7 @@ export class AppModule implements OnModuleInit {
       Logger.error(`Please clear the database and try again`);
       process.exit(-1);
     }
-    for (const module of modules) {
+    for (const [module, actions] of Object.entries(permissions)) {
       for (const action of actions) {
         tasks.push(
           this.permission.create(

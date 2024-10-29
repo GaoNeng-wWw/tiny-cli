@@ -3,7 +3,7 @@
     "unauth": "UnAuth",
     "tokenError": "Token invalid",
     "tokenExpire": "Token expire",
-    "forbidoen": "Forbidoen"
+    "forbidden": "Need `{permission}` permission, but you don't have it"
   },
   "user":{
     "oldPasswordError": "Old password error",
@@ -26,7 +26,8 @@
   "lang": {
     "notExists": "{lang} not found",
     "exists": "{name} exists",
-    "notExistsCommon": "Not found"
+    "notExistsCommon": "Not found",
+    "DELETE_LANG_CONFLICT": "Please clear all language records under {name} first"
   },
   "i18":{
     "exists": "I18n field exists",

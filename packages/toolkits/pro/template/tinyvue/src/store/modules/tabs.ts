@@ -18,7 +18,16 @@ const initTabs = () => {
   const routes = useRouter()
     .getRoutes()
     .map((route) => route.path);
-  return tabs.filter((tab) => routes.includes(tab.link));
+  const i18n = useRouter().getRoutes();
+  return tabs
+    .filter((tab) => routes.includes(tab.link))
+    .map((item) => {
+      const i18route = i18n.filter((route) => route.path === item.link)[0];
+      return {
+        name: i18route.meta.locale ?? item.name ?? '',
+        link: item.link,
+      };
+    });
 };
 const initCurrent = () => {
   const current = JSON.parse(
@@ -67,7 +76,7 @@ export const useTabStore = defineStore('tabs', {
       return this.data.filter((tab) => tab.link === link);
     },
     delByLink(link: string, endsWith = false) {
-      let curName = '';
+      let curName = this.current.name;
       if (this.data.length === 1) {
         return '';
       }
@@ -77,14 +86,14 @@ export const useTabStore = defineStore('tabs', {
       if (idx === -1) {
         return '';
       }
-      const hasNext = idx < this.data.length - 1;
-      if (hasNext) {
-        curName = this.data[idx + 1].name;
-      } else {
-        const hasPrev = idx > 0;
-        if (hasPrev) {
-          curName = this.data[idx - 1].name;
-        }
+      const currentIdx = this.data.findIndex(
+        (tab) => tab.link === this.current.link,
+      );
+      const isDeleteSelf = currentIdx === idx;
+      const next = this.data[currentIdx + 1];
+      const prev = this.data[currentIdx - 1];
+      if (isDeleteSelf) {
+        curName = next?.name ?? prev?.name;
       }
       this.data.splice(idx, 1);
       localStorage.setItem(
