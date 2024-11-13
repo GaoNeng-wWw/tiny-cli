@@ -18,3 +18,9 @@ coverage
 !template/**/tsconfig.json
 !template/**/tsconfig.module.json
 !template/**/tslint.json
+node_modules
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+template/**/dist/
+template/**/node_modules/

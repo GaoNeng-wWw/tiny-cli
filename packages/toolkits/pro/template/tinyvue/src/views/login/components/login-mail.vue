@@ -55,7 +55,12 @@
 
 <script lang="ts" setup>
   import { inject, ref, reactive, computed } from 'vue';
-  import { useRouter } from 'vue-router';
+  import {
+    RouteParamsRaw,
+    RouteRecordRaw,
+    useRoute,
+    useRouter,
+  } from 'vue-router';
   import {
     Form as TinyForm,
     FormItem as TinyFormItem,
@@ -69,11 +74,17 @@
   import { useI18n } from 'vue-i18n';
   import { useUserStore } from '@/store';
   import useLoading from '@/hooks/loading';
+  import { useMenuStore } from '@/store/modules/router';
+  import { useLocales } from '@/store/modules/locales';
+  import { toRoutes } from '@/router/guard/menu';
+  import { AxiosError } from 'axios';
 
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, mergeLocaleMessage } = useI18n();
   const { loading, setLoading } = useLoading();
   const userStore = useUserStore();
+  const menuStore = useMenuStore();
+  const localeStore = useLocales();
   const loginFormMail = ref();
 
   const rules = computed(() => {
@@ -96,7 +107,7 @@
   });
 
   const loginMail = reactive({
-    mailname: 'admin@example.com',
+    mailname: 'admin@no-reply.com',
     mailpassword: 'admin',
     rememberPassword: true,
   });
@@ -117,25 +128,73 @@
 
       try {
         await userStore.login({
-          username: loginMail.mailname,
+          email: loginMail.mailname,
           password: loginMail.mailpassword,
         });
         Modal.message({
           message: t('login.form.login.success'),
           status: 'success',
         });
-        const { redirect, ...othersQuery } = router.currentRoute.value.query;
-        router.push({
-          name: (redirect as string) || 'Home',
-          query: {
-            ...othersQuery,
-          },
+
+        await localeStore.fetchLocalTable();
+        const entries = Object.entries(localeStore.localTable);
+        for (let i = 0; i < entries.length; i += 1) {
+          const key = entries[i][0];
+          const messages = entries[i][1];
+          mergeLocaleMessage(key, messages);
+        }
+        localeStore.$patch({
+          shouldMerge: false,
         });
+
+        await menuStore.getMenuList();
+        const routes = toRoutes(menuStore.menuList);
+
+        routes.forEach((route) => {
+          if (!router.hasRoute(route.name)) {
+            router.addRoute('root', route);
+          }
+        });
+
+        const route = router.currentRoute;
+        const { redirect = 'Home' } = route.value.query;
+        const blackList = ['login', 'notFound', 'redirect', 'preview', 'root'];
+        let redirectTo = blackList.includes(redirect.toString())
+          ? 'Home'
+          : redirect.toString();
+        if (!router.hasRoute(redirectTo)) {
+          const [routerItem] = router.getRoutes().filter((routeItem) => {
+            return (
+              routeItem.name &&
+              !blackList.includes(routeItem.name.toString()) &&
+              routeItem.children.length === 0
+            );
+          });
+          if (!routerItem) {
+            Notify({
+              type: 'error',
+              message: t('router.not-exists-valid-route'),
+              duration: 2000,
+            });
+            return;
+          }
+          redirectTo = routerItem.name.toString();
+        }
+
+        router.replace({ name: redirectTo });
       } catch (err) {
+        let title = t('login.tip.right');
+        let message = t('login.tip.mail');
+        if (err instanceof AxiosError) {
+          if (err.status === 500) {
+            message = t('http.error.InternalError');
+            title = undefined;
+          }
+        }
         Notify({
           type: 'error',
-          title: t('login.tip.right'),
-          message: t('login.tip.mail'),
+          title,
+          message,
           position: 'top-right',
           duration: 2000,
           customClass: 'my-custom-cls',

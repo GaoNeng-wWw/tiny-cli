@@ -1,20 +1,28 @@
-import { defineStore } from 'pinia';
+import {defineStore} from 'pinia';
 import {
   login as userLogin,
-  loginMail as userLoginMail,
-  getUserInfo,
-  updateUserInfo,
+  logout as userLogout,
   LoginData,
   LoginDataMail,
+  loginMail as userLoginMail,
+  updateUserInfo,
+  getUserInfo,
+  getAllUser,
 } from '@/api/user';
-import { setToken, clearToken } from '@/utils/auth';
-import { removeRouteListener } from '@/utils/route-listener';
-import { UserState, UserInfo } from './types';
+import {getRoleMenu} from "@/api/menu";
+import {clearToken, getToken, setToken} from '@/utils/auth';
+import {removeRouteListener} from '@/utils/route-listener';
+import {useRouter} from "vue-router";
+import {getRoleInfo} from "@/api/role";
+import {UserInfo, UserState} from './types';
+
+const router = useRouter();
 
 const useUserStore = defineStore('user', {
   state: (): UserState => ({
-    userId: '10000',
-    username: 'admin',
+    id: '10000',
+    name: 'admin',
+    email: 'admin@no-reply.com',
     department: 'Tiny-Vue-Pro',
     employeeType: 'social recruitment',
     job: 'Front end',
@@ -33,6 +41,8 @@ const useUserStore = defineStore('user', {
     filterType: [],
     submit: false,
     reset: false,
+    roleId: 0,
+    rolePermission: [],
   }),
 
   getters: {
@@ -66,12 +76,6 @@ const useUserStore = defineStore('user', {
       this.filterType = [];
     },
 
-    // Get user's information
-    async info() {
-      const res = await getUserInfo();
-      this.setInfo(res.data);
-    },
-
     async updateInfo(data: UserInfo) {
       const res = await updateUserInfo(data);
       this.setInfo(res.data);
@@ -81,8 +85,37 @@ const useUserStore = defineStore('user', {
     async login(loginForm: LoginData) {
       try {
         const res = await userLogin(loginForm);
-        const { token, userInfo } = res.data;
+        const { token } = res.data;
         setToken(token);
+        const userRes = await getUserInfo(loginForm.email)
+        const userInfo = {
+          id: userRes.data.id,
+          name:userRes.data.name,
+          email:userRes.data.email,
+          role:'',
+          department: userRes.data.department,
+          employeeType: userRes.data.employeeType,
+          job: '',
+          probationStart: userRes.data.probationStart,
+          probationEnd: userRes.data.probationEnd,
+          probationDuration: userRes.data.probationDuration,
+          protocolStart: userRes.data.protocolStart,
+          protocolEnd: userRes.data.protocolEnd,
+          address: userRes.data.address,
+          status: userRes.data.status,
+          roleId: 0,
+          rolePermission: []
+        }
+        if(userRes.data.role){
+          userInfo.role = userRes.data.role[0].name;
+          userInfo.job = userRes.data.role[0].name;
+          userInfo.roleId = userRes.data.role[0].id;
+        }
+        const {data} = await getRoleInfo(userInfo.roleId)
+        const permissions = data.permission;
+        for (let i = 0; i < permissions.length; i += 1) {
+          userInfo.rolePermission.push(permissions[i].name)
+        }
         this.setInfo(userInfo);
       } catch (err) {
         clearToken();
@@ -102,6 +135,10 @@ const useUserStore = defineStore('user', {
 
     // Logout
     async logout() {
+      const data = {
+        token:getToken()
+      }
+      await userLogout(data);
       this.resetInfo();
       clearToken();
       removeRouteListener();

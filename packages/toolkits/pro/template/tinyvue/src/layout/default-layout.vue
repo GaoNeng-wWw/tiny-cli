@@ -11,11 +11,27 @@
       <template #aside>
         <tiny-layout class="layout-sider">
           <div class="menu-wrapper">
-            <Menu />
+            <Suspense>
+              <Menu v-if="reloadKey !== 'menu'" />
+            </Suspense>
           </div>
         </tiny-layout>
       </template>
       <tiny-layout class="layout-content">
+        <Tabs
+          :key="tabsRefreshKey"
+          v-model="currentTabName"
+          with-close
+          @click="onClick"
+          @close="onClose"
+        >
+          <tab-item
+            v-for="(history, idx) of tabsHistory"
+            :key="idx"
+            :title="t(history.name)"
+            :name="history.link"
+          ></tab-item>
+        </Tabs>
         <PageLayout />
       </tiny-layout>
       <template #footer>
@@ -56,24 +72,126 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, watch, onMounted } from 'vue';
+  import { ref, watch, onMounted, computed, nextTick, provide } from 'vue';
+  import { useI18n } from 'vue-i18n';
   import {
     Container as TinyContainer,
     Layout as TinyLayout,
     Modal as tinyModal,
+    Tabs,
+    TabItem,
+    Modal,
   } from '@opentiny/vue';
   import TinyThemeTool from '@opentiny/vue-theme/theme-tool.js';
-  import { useAppStore } from '@/store';
-    // eslint-disable-next-line import/extensions
+  import { useAppStore, useTabStore } from '@/store';
+  // eslint-disable-next-line import/extensions
   import Footer from '@/components/footer/index.vue';
   import NavBar from '@/components/navbar/index.vue';
   import Theme from '@/components/theme/index.vue';
   import Menu from '@/components/menu/index.vue';
-  import { DefaultTheme } from '@/components/theme/type';
+  import { useRouter } from 'vue-router';
+  import { useTheme } from '@/hooks/useTheme';
+  import locale from '@opentiny/vue-locale';
   import PageLayout from './page-layout.vue';
+
   // 动态切换
+  const router = useRouter();
   const appStore = useAppStore();
   const changefooter = ref('#fff');
+
+  const { t } = useI18n();
+  const tabStore = useTabStore();
+
+  const tabsHistory = computed(() => tabStore.data);
+  const currentTabName = ref();
+
+  const reloadKey = ref('');
+  const reloadMenu = () => {
+    reloadKey.value = 'menu';
+    nextTick(() => {
+      reloadKey.value = '';
+    });
+  };
+  const tabsRefreshKey = ref('');
+  provide('RELOAD', {
+    reloadMenu,
+  });
+
+  watch(
+    () => tabStore.current,
+    () => {
+      currentTabName.value = tabStore.current?.link;
+    },
+    { deep: true, immediate: true },
+  );
+
+  const onClick = (tab: { name: string; link: string }) => {
+    const routePaths = router.getRoutes().map((routeItem) => routeItem.path);
+    if (!routePaths.includes(tab.name)) {
+      Modal.message({
+        message: locale.t('exception.result.404.description'),
+        status: 'error',
+      });
+      const curName = tabStore.delByLink(tab.name);
+      tabStore.set(curName);
+      tabStore.$patch({
+        current: tabStore.getByName(curName)[0],
+      });
+      currentTabName.value = tabStore.current?.link;
+      tabsRefreshKey.value = '1';
+      nextTick(() => {
+        tabsRefreshKey.value = '';
+      });
+    } else {
+      router.replace(tab.name);
+    }
+  };
+  const onClose = (name: string) => {
+    if (tabStore.data.length === 1) {
+      return;
+    }
+    const routerPaths = router.getRoutes().map((r) => r.path);
+    const deleteItemIndex = tabStore.data.findIndex(
+      (item) => item.link === name,
+    );
+    let rightIdx = deleteItemIndex + 1;
+    let leftIdx = deleteItemIndex - 1;
+    let path = '';
+    const deleteSelf = tabStore.data[deleteItemIndex] === tabStore.current;
+    if (!deleteSelf) {
+      tabStore.delByLink(name);
+      return;
+    }
+    let curName = '';
+    // 向右找到一个最近的路由项
+    while (rightIdx < tabStore.data.length && !path) {
+      const item = tabStore.data[rightIdx];
+      if (routerPaths.includes(item.link)) {
+        path = item.link;
+        curName = item.name;
+        break;
+      }
+      rightIdx += 1;
+    }
+    // 向左找到一个最近的路由
+    while (leftIdx >= 0 && !path) {
+      const item = tabStore.data[leftIdx];
+      if (routerPaths.includes(item.link)) {
+        path = item.link;
+        curName = item.name;
+        break;
+      }
+      leftIdx -= 1;
+    }
+    // 找不到存在的路由则不删除当前路由也不跳转
+    if (leftIdx < 0 && rightIdx >= tabStore.data.length && !path) {
+      return;
+    }
+    tabStore.delByLink(name);
+    // 跳转到最近的一个合法路由
+    tabStore.set(curName);
+    router.push({ path });
+  };
 
   // 切换简约模式，图标按钮
   const top = ref('10px');
@@ -88,7 +206,9 @@
 
   // 主题配置
   const disTheme = ref(false);
-  const theme = new TinyThemeTool()
+  const theme = new TinyThemeTool();
+  useTheme(theme);
+  provide('THEME', theme);
   const themeVisible = () => {
     disTheme.value = !disTheme.value;
   };
@@ -114,11 +234,6 @@
     }
   });
   // 初始化默认主题
-  onMounted(() => {
-    appStore.updateSettings({ theme: 'light' });
-    theme.changeTheme(DefaultTheme);
-    appStore.updateSettings({ themelist: 'default' });
-  });
 </script>
 
 <style scoped lang="less">
@@ -174,8 +289,8 @@
 
   .layout :deep(.tiny-container .tiny-container__footer) {
     display: flex;
-    padding-top: 15px;
     justify-content: center;
+    padding-top: 15px;
     background-color: #f5f6f7;
   }
 
@@ -191,9 +306,21 @@
       padding-left: 6px !important;
     }
   }
-   :deep(.tiny-tree-node__children > .tree-node-body) {
+
+  :deep(.tiny-tree-node__children > .tree-node-body) {
     padding-left: 50px;
-   }
+  }
+
+  :deep(
+      .tiny-container__main > .tiny-layout > .tiny-tabs > .tiny-tabs__content
+    ) {
+    display: none;
+  }
+
+  :deep(.tiny-tabs--top) {
+    padding: 0 16px;
+  }
+
   .theme-box {
     position: fixed;
     top: 88%;

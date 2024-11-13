@@ -70,12 +70,14 @@
   import { useUserStore } from '@/store';
   import useLoading from '@/hooks/loading';
   import { setToken } from '@/utils/auth';
+import { useMenuStore } from '@/store/modules/router';
 
   const router = useRouter();
   const { t } = useI18n();
   const { loading, setLoading } = useLoading();
   const userStore = useUserStore();
   const loginFormInfo = ref();
+  const menuStore = useMenuStore()
 
   const rules = computed(() => {
     return {
@@ -131,14 +133,16 @@
 
       try {
         await userStore.login({
-          username: loginInfo.username,
+          email: loginInfo.username,
           password: loginInfo.password,
         });
         Modal.message({
           message: t('login.form.login.success'),
           status: 'success',
         });
-        const { redirect, ...othersQuery } = router.currentRoute.value.query;
+
+        const { redirect, ...othersQuery } = router.currentRoute.value.query ?? {redirect: 'Home'};
+        router.replace({name: redirect?.toString() ?? 'Home'})
         router.push({
           name: (redirect as string) || 'Home',
           query: {

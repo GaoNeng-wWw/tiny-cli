@@ -24,7 +24,25 @@
 
 <script lang="ts" setup>
   import Footer from '@/components/footer/index.vue';
+  import { useMenuStore } from '@/store/modules/router';
+  import { TAB_PERSISTENCE_KEYS } from '@/store/modules/tabs';
+  import { clearToken } from '@/utils/auth';
+  import { useRouter } from 'vue-router';
+  import { onMounted, nextTick } from 'vue';
   import LoginForm from './components/login-form.vue';
+
+  const router = useRouter();
+  onMounted(() => {
+    const menuStore = useMenuStore();
+    localStorage.removeItem(TAB_PERSISTENCE_KEYS.CURRENT);
+    localStorage.removeItem(TAB_PERSISTENCE_KEYS.TABS);
+    clearToken();
+    if (menuStore.menuList.length) {
+      setTimeout(() => {
+        router.go(0);
+      }, 500);
+    }
+  });
 </script>
 
 <style lang="less" scoped>

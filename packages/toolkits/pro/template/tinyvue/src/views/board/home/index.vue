@@ -12,6 +12,7 @@
 </template>
 
 <script lang="ts" setup>
+  import transitionFadeDownGroup from '@/components/transition/transition-fade-down-group.vue';
   import Main from './components/main.vue';
   import Curve from './components/curve.vue';
   import Falls from './components/falls.vue';
@@ -21,8 +22,8 @@
 
 <style scoped lang="less">
   .container {
-    width: 98%;
-    height: inherit;
+    width: 100%;
+    height: calc(100% - 60px);
     margin: 0 auto;
     overflow-x: hidden;
     overflow-y: auto;
@@ -33,7 +34,7 @@
   // responsive
   @media (max-width: @screen-xs) {
     .container {
-      overflow-x: auto;
+      overflow-x: hidden;
     }
   }
 </style>

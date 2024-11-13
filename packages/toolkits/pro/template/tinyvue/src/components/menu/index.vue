@@ -2,18 +2,20 @@
   <div class="menu-router">
     <tiny-tree-menu
       ref="tree"
-      :data="treeDataFilter"
+      :data="MenuData"
       :show-filter="false"
       node-key="id"
       wrap
       :default-expanded-keys="expandeArr"
+      only-check-children
+      check-strictly
       @current-change="currentChange"
     >
       <template #default="slotScope">
         <template v-for="(item, index) in routerTitle" :key="index">
-          <span v-if="slotScope.label === item.value" class="menu-title">
-            <component :is="item.icon"></component>
-            <span :class="item.bold">{{ $t(item.name) }}</span>
+          <span v-if="slotScope.label === item.label" class="menu-title">
+            <component :is="item.customIcon"></component>
+            <span>{{ $t(item.locale) }}</span>
           </span>
         </template>
       </template>
@@ -22,354 +24,111 @@
 </template>
 
 <script lang="ts" setup>
-  import { computed, watch, ref, onMounted } from 'vue';
-  import { RouteRecordNormalized } from 'vue-router';
-  import {
-    IconDownloadCloud,
-    IconFiles,
-    IconSetting,
-    IconSuccessful,
-    IconCueL,
-    IconUser,
-    IconFiletext,
-    IconApplication,
-  } from '@opentiny/vue-icon';
+  import { ref, onMounted, watch, computed, unref } from 'vue';
   import { TreeMenu as tinyTreeMenu } from '@opentiny/vue';
+  import { useMenuStore } from '@/store/modules/router';
   import router from '@/router';
-  import { useUserStore } from '@/store';
-  import { TabItem } from '@opentiny/vue';
+  import { ITreeNodeData } from '@/router/guard/menu';
+  import * as icons from '@opentiny/vue-icon';
+  import { useTabStore } from '@/store';
+  import { useDeepClone } from '@/hooks/useDeepClone';
 
-  // icon图标
-  const iconDownloadCloud = IconDownloadCloud();
-  const iconFiles = IconFiles();
-  const iconSetting = IconSetting();
-  const iconSuccessful = IconSuccessful();
-  const iconCueL = IconCueL();
-  const iconUser = IconUser();
-  const iconFiletext = IconFiletext();
-  const iconApplication = IconApplication();
-  const tree = ref();
-  const expandeArr = ref();
-  const routerTitle = [
-    {
-      value: 'Board',
-      name: 'menu.board',
-      icon: iconApplication,
-      bold: 'main-title',
-    },
-    {
-      value: 'Home',
-      name: 'menu.home',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'Work',
-      name: 'menu.work',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'List',
-      name: 'menu.list',
-      icon: iconFiles,
-      bold: 'main-title',
-    },
-    {
-      value: 'Table',
-      name: 'menu.list.searchTable',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'Form',
-      name: 'menu.form',
-      icon: iconSetting,
-      bold: 'main-title',
-    },
-    {
-      value: 'Base',
-      name: 'menu.form.base',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'Step',
-      name: 'menu.form.step',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'Profile',
-      name: 'menu.profile',
-      icon: iconFiletext,
-      bold: 'main-title',
-    },
-    {
-      value: 'Detail',
-      name: 'menu.profile.detail',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'Result',
-      name: 'menu.result',
-      icon: iconSuccessful,
-      bold: 'main-title',
-    },
-    {
-      value: 'Success',
-      name: 'menu.result.success',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'Error',
-      name: 'menu.result.error',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'Cloud',
-      name: 'menu.cloud',
-      icon: iconDownloadCloud,
-      bold: 'main-title',
-    },
-    {
-      value: 'Hello',
-      name: 'menu.cloud.hello',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'Contracts',
-      name: 'menu.cloud.contracts',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'Exception',
-      name: 'menu.exception',
-      icon: iconCueL,
-      bold: 'main-title',
-    },
-    {
-      value: '403',
-      name: 'menu.exception.403',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: '404',
-      name: 'menu.exception.404',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: '500',
-      name: 'menu.exception.500',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'User',
-      name: 'menu.user',
-      icon: iconUser,
-      bold: 'main-title',
-    },
-    {
-      value: 'Info',
-      name: 'menu.user.info',
-      icon: null,
-      bold: 'title',
-    },
-    {
-      value: 'Setting',
-      name: 'menu.user.setting',
-      icon: null,
-      bold: 'title',
-    },
-  ];
+  const menuStore = useMenuStore();
+  await menuStore.getMenuList();
+  const rawMenuData = computed(() => useDeepClone(unref(menuStore.menuList)));
+  type SideMenuData = (ITreeNodeData & { meta: { url: string } })[];
 
-  // 获取路由数据
-  const appRoute = computed(() => {
-    return router
-      .getRoutes()
-      .find((el: { name: string; }) => el.name === 'root') as RouteRecordNormalized;
-  });
-  const copyRouter = JSON.parse(JSON.stringify(appRoute.value.children));
-  copyRouter.sort((a: RouteRecordNormalized, b: RouteRecordNormalized) => {
-    return (a.meta.order || 0) - (b.meta.order || 0);
-  });
+  let routerTitle = [] as any;
 
-  const userStore = useUserStore();
-  const role = computed(() => userStore.role);
-  let treeData = ref(copyRouter);
-  const treeDataForEach = (arr: any[]) => {
-    return arr.filter((e: { children: any[]; meta: { hideInMenu: any } }) => {
-      if (e.children) {
-        e.children = e.children.filter((v: { meta: { hideInMenu: any } }) => {
-          return !v.meta.hideInMenu;
-        });
-        treeDataForEach(e.children);
+  const filtter = (treeNodeDatas: ITreeNodeData[]) => {
+    const menus: SideMenuData = [];
+    for (let i = 0; i < treeNodeDatas.length; i += 1) {
+      const treeNodeData = treeNodeDatas[i];
+      const url = treeNodeData.url!;
+      delete treeNodeData.url;
+      const temp = {} as any;
+      temp.label = treeNodeData.label;
+      temp.locale = treeNodeData.locale;
+      if (treeNodeData.customIcon) {
+        temp.customIcon = icons[treeNodeData.customIcon]();
       }
-      return !e.meta.hideInMenu;
-    });
+      routerTitle.push(temp);
+      menus.push({
+        ...treeNodeData,
+        meta: {
+          url,
+        },
+        children: [...filtter(treeNodeData.children ?? [])],
+      });
+    }
+    return menus;
   };
-  const treeDataFilter = treeDataForEach(treeData.value);
 
-  watch(
-    role,
-    (newValue: string) => {
-      if (newValue === 'admin') {
-        treeData.value = copyRouter;
-      } else {
-        treeData.value = copyRouter.filter(
-          (item: { name: string }) => item.name !== 'User'
-        );
+  const MenuData = computed(() => {
+    if (routerTitle.length) {
+      routerTitle = [];
+    }
+    return filtter(rawMenuData.value);
+  });
+
+  const currentChange = (data: any, node) => {
+    if (!node.isLeaf) {
+      return;
+    }
+    router.replace({ name: data.label });
+  };
+
+  const findId = (name: string, path: string) => {
+    const dfs = (item, url: string[]) => {
+      if (url.join('/') === path) {
+        return item.id;
       }
-    },
-    { immediate: true }
-  );
-
-  /**
-   * 监听路由变化高亮当前菜单
-   */
+      const len = item.children.length ?? 0;
+      for (let i = 0; i < len; i += 1) {
+        if (item.children?.[i]) {
+          const id = dfs(
+            item.children[i],
+            [...url, item.children[i].meta.url].filter((p) => p.length),
+          );
+          if (id !== undefined) {
+            return id;
+          }
+        }
+      }
+      return undefined;
+    };
+    for (let i = 0; i < MenuData.value.length; i += 1) {
+      const menu = MenuData.value[i];
+      const data = dfs(menu, [
+        import.meta.env.VITE_CONTEXT.replace(/\/$/, ''),
+        menu.meta.url.replace(/\/$/, ''),
+      ]);
+      if (data !== undefined) {
+        return data;
+      }
+    }
+    return -1;
+  };
+  const tree = ref();
+  const expandeArr = ref<(string | number)[]>([]);
+  const tabStore = useTabStore();
   onMounted(() => {
     watch(
-      () => router.currentRoute.value.path,
-      (newValue: string) => {
-        const menuKey = newValue
-          .replace(/^.*\//, '')
-          .replace(/^[a-z]/, (s: string) => s.toUpperCase());
-        expandeArr.value = [menuKey];
-        tree.value.setCurrentKey(menuKey);
+      () => tabStore.current,
+      () => {
+        if (!tabStore.current) {
+          return;
+        }
+        const key = findId(tabStore.current.name, tabStore.current.link);
+        tree.value.setCurrentKey(key);
+        const { parentId = null } = tree.value.getCurrentNode();
+        if (parentId && !expandeArr.value.includes(parentId)) {
+          expandeArr.value = expandeArr.value.concat(parentId);
+        }
       },
-      { immediate: true },
+      { deep: true, immediate: true },
     );
   });
-  const currentChange = (data: any) => {
-    const filter = [
-      'Exception',
-      'Form',
-      'Board',
-      'List',
-      'Profile',
-      'Result',
-      'User',
-      'Cloud',
-    ];
-    if (filter.indexOf(data.id) === -1) {
-      router.push({ name: data.id });
-    }
-  };
 </script>
 
-<style lang="less" scoped>
-  .main-title {
-    height: 20px;
-    font-size: 14px;
-    line-height: 20px;
-    text-align: left;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    word-break: break-all;
-    color: #000;
-  }
-
-  .title {
-    height: 20px;
-    font-size: 14px;
-    line-height: 20px;
-    text-align: left;
-  }
-
-  .menu-title {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    height: 20px;
-
-    > svg {
-      width: 1.3em;
-      height: 1.3em;
-    }
-  }
-
-  :deep(.tiny-tree-node__wrapper > .is-current > .tiny-tree-node__content) {
-    color: #000 !important;
-    background: none !important;
-    margin-left: 0 !important;
-    &:hover {
-      background: #fff !important;
-      color: #fff !important;
-    }
-  }
-
-  :deep(.tiny-tree-node__wrapper > .is-expanded >  .tiny-tree-node__children
-  > .tiny-tree-node__wrapper > .is-current > .tiny-tree-node__content
-  ) {
-    background-color: var(--ti-tree-menu-node-hover-bg-color) !important;
-    margin-left: 0 !important;
-    &:hover {
-      background: var(--ti-tree-menu-node-hover-bg-color) !important;
-    }
-  }
-
-  :deep(.tiny-tree-node__wrapper > .is-expanded > .tiny-tree-node__children
-  .tiny-tree-node__wrapper .is-current .tiny-tree-node__content .tree-node-name) {
-    border-left: 2px solid var(--ti-tree-menu-square-left-border-color, '#fff') !important;
-  }
-
-  :deep(.tiny-tree-node__wrapper > .is-expanded > .tiny-tree-node__children
-  .tiny-tree-node__wrapper .is-current .tiny-tree-node__content .tiny-tree-node__content-right) {
-    background-color: var(--ti-tree-menu-node-hover-bg-color) !important;
-  }
-
-  :deep(.tiny-tree-node__wrapper > .is-expanded > .tiny-tree-node__children
-  .tiny-tree-node__wrapper .is-current .tiny-tree-node__content .tiny-tree-node__content-left
-  .tiny-tree-node__content-box) {
-    background-color: var(--ti-tree-menu-node-hover-bg-color) !important;
-  }
-
-  :deep(.tiny-tree-node__wrapper > .is-expanded > .tiny-tree-node__children
-  .tiny-tree-node__wrapper .is-current .tiny-tree-node__content .tiny-tree-node__content-left
-  .tiny-tree-node__content-box:before) {
-    display: none !important;
-  }
-
-  :deep(.tiny-tree-node__wrapper > .is-expanded > .tiny-tree-node__children
-  .tiny-tree-node__wrapper .is-current .tiny-tree-node__content .tiny-tree-node__content-left:before) {
-    display: none !important;
-  }
-
-  :deep(.tiny-tree-node__wrapper > .is-current > .tiny-tree-node__content) {
-    background-color: #fff !important;
-  }
-
-  :deep(.tiny-tree-node__wrapper > .is-current > .tiny-tree-node__content .tiny-tree-node__content-box) {
-    background-color: #fff !important;
-  }
-
-  :deep(.tiny-tree-node__content:hover) {
-    background-color: var(--ti-tree-node-content-hover-bg-color) !important;
-  }
-
-  :deep(.tiny-tree-menu__wrap > .tiny-tree-node__wrapper > .is-root > .tiny-tree-node__content
-  > .tiny-tree-node__content-left .tiny-tree-node__content-box .tree-node-name) {
-    padding: 0 8px !important;
-  }
-
-  :deep(.tiny-tree-node > .tiny-tree-node__content) {
-    margin-left: 0 !important;
-  }
-
-  .tiny-tree-menu
-    .tiny-tree
-    .tiny-tree-node.is-current
-    > .tiny-tree-node__content
-    .tree-node-name
-    .tiny-svg {
-    fill: var(--ti-base-icon-color);
-  }
-</style>
+<style scoped></style>

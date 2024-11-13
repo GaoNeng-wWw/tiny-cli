@@ -58,39 +58,138 @@
             :value="item.label"
             @click="switchUser(item.value)"
           >
-            <iconReplace v-if="item.value === 1"></iconReplace>
-            <iconUser v-if="item.value === 2"></iconUser>
-            <iconWriting v-if="item.value === 3"></iconWriting>
-            <iconCheckOut v-if="item.value === 4"></iconCheckOut>
+            <iconUser v-if="item.value === 1"></iconUser>
+            <iconCheckOut v-if="item.value === 2"></iconCheckOut>
+            <iconEdit v-if="item.value === 3"></iconEdit>
             {{ $t(item.label) }}
           </li>
         </div>
       </li>
     </ul>
   </div>
+  <div v-if="state.isPwdUpdate">
+    <tiny-modal
+      v-model="state.isPwdUpdate"
+      :lock-scroll="true"
+      show-header
+      show-footer
+      mask-closable="true"
+      height="auto"
+      width="600"
+      :title="$t('userInfo.modal.title.pwdUpdate')"
+    >
+      <template #default>
+        <tiny-layout>
+          <tiny-form
+            :model="state.pwdData"
+            :rules="rules"
+            label-width="150px"
+            :label-align="true"
+            label-position="left"
+            size="small"
+          >
+            <tiny-row :flex="true" justify="left">
+              <tiny-col :span="10" label-width="100px">
+                <tiny-form-item :label="$t('userInfo.table.email')">
+                  <label>{{ userStore.userInfo.email }}</label>
+                </tiny-form-item>
+              </tiny-col>
+            </tiny-row>
+
+            <tiny-row :flex="true" justify="left">
+              <tiny-col :span="10" label-width="100px">
+                <tiny-form-item
+                  :label="$t('userInfo.modal.input.oldPassword')"
+                  prop="oldPassword"
+                >
+                  <tiny-input
+                    v-model="state.pwdData.oldPassword"
+                    type="password"
+                    show-password
+                  ></tiny-input>
+                </tiny-form-item>
+              </tiny-col>
+            </tiny-row>
+
+            <tiny-row :flex="true" justify="left">
+              <tiny-col :span="10" label-width="100px">
+                <tiny-form-item
+                  :label="$t('userInfo.modal.input.newPassword')"
+                  prop="newPassword"
+                >
+                  <tiny-input
+                    v-model="state.pwdData.newPassword"
+                    type="password"
+                    show-password
+                  ></tiny-input>
+                </tiny-form-item>
+              </tiny-col>
+            </tiny-row>
+
+            <tiny-row :flex="true" justify="left">
+              <tiny-col :span="10" label-width="100px">
+                <tiny-form-item
+                  :label="$t('userInfo.modal.input.confirmNewPassword')"
+                  prop="confirmNewPassword"
+                >
+                  <tiny-input
+                    v-model="state.pwdData.confirmNewPassword"
+                    type="password"
+                    show-password
+                  ></tiny-input>
+                </tiny-form-item>
+              </tiny-col>
+            </tiny-row>
+          </tiny-form>
+        </tiny-layout>
+      </template>
+      <template #footer>
+        <tiny-button type="primary" @click="handlePwdUpdateSubmit">{{
+          $t('menu.btn.confirm')
+        }}</tiny-button>
+        <tiny-button @click="handlePwdUpdateCancel">{{
+          $t('menu.btn.cancel')
+        }}</tiny-button>
+      </template>
+    </tiny-modal>
+  </div>
 </template>
 
 <script lang="ts" setup>
-  import { ref } from 'vue';
+  import { reactive, ref, computed } from 'vue';
   import { useI18n } from 'vue-i18n';
-  import { UserHead as TinyUserHead, Modal } from '@opentiny/vue';
+  import {
+    UserHead as TinyUserHead,
+    Modal as TinyModal,
+    Button as TinyButton,
+    Form as TinyForm,
+    FormItem as TinyFormItem,
+    Row as TinyRow,
+    Col as TinyCol,
+    Input as TinyInput,
+  } from '@opentiny/vue';
   import {
     IconReplace,
     IconUser,
     IconCheckOut,
     IconWriting,
+    IconEdit,
   } from '@opentiny/vue-icon';
   import { useAppStore, useUserStore } from '@/store';
   import router from '@/router';
   import { LOCALE_OPTIONS } from '@/locale';
   import useLocale from '@/hooks/locale';
   import useUser from '@/hooks/user';
+  import { getToken } from '@/utils/auth';
+  import { updatePwdUser } from '@/api/user';
 
   const i18 = useI18n();
+  const { t } = useI18n();
   const iconReplace = IconReplace();
   const iconUser = IconUser();
   const iconCheckOut = IconCheckOut();
   const iconWriting = IconWriting();
+  const iconEdit = IconEdit();
   const lan = ref(false);
 
   const appStore = useAppStore();
@@ -98,6 +197,15 @@
   const { logout } = useUser();
   const { changeLocale } = useLocale();
   const locales = [...LOCALE_OPTIONS];
+
+  // 加载效果
+  const state = reactive<{
+    isPwdUpdate: boolean;
+    pwdData: any;
+  }>({
+    isPwdUpdate: false,
+    pwdData: {} as any,
+  });
 
   // 切换语言
   const changeLan = () => {
@@ -115,16 +223,28 @@
 
   // 用户设置
   const userlist = [
-    { label: 'messageBox.switchRoles', value: 1 },
-    { label: 'messageBox.userCenter', value: 2 },
-    { label: 'messageBox.userSettings', value: 3 },
-    { label: 'messageBox.logout', value: 4 },
+    { label: 'messageBox.userCenter', value: 1 },
+    { label: 'messageBox.updatePwd', value: 2 },
+    { label: 'messageBox.logout', value: 3 },
   ];
+
+  // 校验规则
+  const rulesType = {
+    required: true,
+    trigger: 'blur',
+  };
+  const rules = computed(() => {
+    return {
+      oldPassword: [rulesType],
+      newPassword: [rulesType],
+      confirmNewPassword: [rulesType],
+    };
+  });
 
   const switchRoles = async () => {
     const res = await userStore.switchRoles();
-    
-    Modal.message({
+
+    TinyModal.message({
       message: res as string,
       status: 'success',
     });
@@ -133,15 +253,12 @@
   const switchUser = (e: number) => {
     switch (e) {
       case 1:
-        switchRoles();
-        break;
-      case 2:
         router.push({ name: 'Info' });
         break;
-      case 3:
-        router.push({ name: 'Setting' });
+      case 2:
+        handlePwdUpdate();
         break;
-      case 4:
+      case 3:
         logout();
         break;
       default:
@@ -153,6 +270,51 @@
   const jumpUrl = () => {
     window.location.href = `${window.location.protocol}//${window.location.host}`;
   };
+
+  const handlePwdUpdate = () => {
+    state.isPwdUpdate = true;
+  };
+
+  const handlePwdUpdateCancel = () => {
+    state.isPwdUpdate = false;
+    state.pwdData = {} as any;
+  };
+
+  async function handlePwdUpdateSubmit() {
+    let data = state.pwdData;
+    let newTemp = {
+      email: userStore.userInfo.email,
+      token: getToken(),
+      newPassword: data.newPassword,
+      confirmNewPassword: data.confirmNewPassword,
+      oldPassword: data.oldPassword,
+    };
+    if (newTemp.newPassword !== newTemp.confirmNewPassword) {
+      TinyModal.message({
+        message: t('userInfo.modal.message.error'),
+        status: 'error',
+      });
+    } else {
+      try {
+        await updatePwdUser(newTemp);
+        TinyModal.message({
+          message: t('baseForm.form.submit.success'),
+          status: 'success',
+        });
+        state.pwdData = {} as any;
+        state.isPwdUpdate = false;
+        logout();
+      } catch (error) {
+        if (error.response && error.response.data) {
+          const errorMessage = error.response.data.message || '未知错误';
+          TinyModal.message({
+            message: errorMessage,
+            status: 'error',
+          });
+        }
+      }
+    }
+  }
 </script>
 
 <style scoped lang="less">
@@ -284,7 +446,7 @@
 
     .trigger-user {
       position: absolute;
-      bottom: -102px;
+      bottom: -75px;
       display: none;
       width: 100px;
       margin-left: -43px;

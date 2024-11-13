@@ -1,3 +1,31 @@
+export type IPaginationMeta = {
+  itemCount: number;
+  totalItems?: number;
+  itemsPerPage: number;
+  totalPages?: number;
+  currentPage: number;
+};
+
+export type InputFilterValue = {
+  text: string;
+  relation: 'equals' | 'contains' | 'startwith';
+};
+
+export type FilterType = {
+  [key: string]: {
+    type: string;
+    value: InputFilterValue | number[];
+  };
+};
+
+export type Pager = {
+  currentPage: number;
+  pageSizes: number[];
+  layout: string;
+  total: number;
+  pageSize: number;
+};
+
 export interface AnyObject {
   [key: string]: unknown;
 }

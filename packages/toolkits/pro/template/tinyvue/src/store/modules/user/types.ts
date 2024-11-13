@@ -1,7 +1,18 @@
 export type RoleType = '' | '*' | 'admin' | 'user';
+export type Role = {
+  id: number;
+  name: string;
+  permission: {
+    name: string;
+    desc: string;
+    id: number;
+  }[];
+  menus: { id: number; name: string }[];
+};
 export interface UserInfo {
-  userId: string;
-  username: string;
+  id: string;
+  name: string;
+  email: string;
   department?: string;
   employeeType?: string;
   job?: string;
@@ -13,6 +24,10 @@ export interface UserInfo {
   address?: string;
   status?: string;
   role: RoleType;
+  updateTime?: any;
+  createTime?: any;
+  roleId?: number;
+  rolePermission?: string[];
 }
 export interface UserFilterData {
   sort?: number;
