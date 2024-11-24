@@ -50,14 +50,15 @@ npm run link
 有时我们会需要发布一些测试包来测试构建产物是否能够正常使用，您可以根据下列指引来进行测试. 这里使用的是`@opentiny/tiny-toolkit-pro
 `作为演示
 
-0. 自增`package.json`中的`version`字段
-1. `package.json`文件中替换`@opentiny`为`@xxx`(其中xxx为您的npm名称)
-2. 运行`npm publish --access=public`
-3. 修改环境变量`TINY_SCOPE=xxx` (第一步中替换的结果, 但是不要包含@)
+1. 自增`package.json`中的`version`字段
+2. `package.json`文件中替换`@opentiny`为`@xxx`(其中xxx为您的npm名称)
+3. 进入到你要发布子包的目录
+4. 运行`npm publish --access=public`
+5. 修改环境变量`TINY_SCOPE=xxx` (第一步中替换的结果, 但是不要包含@)
    1. 例如 `@foo/tiny-toolkit-pro`，TINY_SCOPE应该是`foo`而不是`@foo`
-4. 安装`npm i -g @opentiny/cli` (如果您安装完成可忽略该步骤)
-5. `rm -rf ~/.tiny`
-6. `tiny init pro`
+6. 安装`npm i -g @opentiny/cli` (如果您安装完成可忽略该步骤)
+7. `rm -rf ~/.tiny`
+8. `tiny init pro`
 
 ### 发布测试包前检查清单
 
