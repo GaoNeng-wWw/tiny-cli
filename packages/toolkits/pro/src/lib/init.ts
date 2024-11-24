@@ -1,3 +1,4 @@
+import { parse, stringify } from 'yaml';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { copySync } from 'fs-extra';
@@ -18,7 +19,7 @@ import {
   VueVersion,
 } from './interfaces';
 import utils from './utils';
-import { existsSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
 
 const log = logs('tiny-toolkit-pro');
 const VUE_TEMPLATE_PATH = 'tinyvue';
@@ -196,8 +197,28 @@ const createServerSync = (answers: ProjectInfo) => {
     PAGINATION_LIMIT: 10,
   };
   const envStr = objToEnv(config);
+  const overwriteDockerComposeConfig = {
+    // @see https://hub.docker.com/_/mysql
+    // This variable is mandatory and specifies the password that will be set for the MySQL root superuser account.
+    MYSQL_ROOT_PASSWORD: config.DATABASE_PASSWORD,
+    MYSQL_DATABASE: config.DATABASE_NAME,
+    MYSQL_USER:
+      config.DATABASE_USERNAME === 'root' ? undefined : config.DATABASE_NAME,
+    MYSQL_PASSWORD:
+      config.DATABASE_USERNAME === 'root'
+        ? undefined
+        : config.DATABASE_PASSWORD,
+  };
   copySync(serverFrom, serverTo);
   writeFileSync(path.join(serverTo, '.env'), envStr);
+  const dockerComposeYaml = readFileSync(
+    path.join(serverTo, 'docker-compose.yml')
+  ).toString();
+  const yaml = parse(dockerComposeYaml);
+  const { services } = yaml;
+  const mysql = services.mysql;
+  mysql.environment = overwriteDockerComposeConfig;
+  writeFileSync(path.join(serverTo, 'docker-compose.yml'), stringify(yaml));
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -324,6 +345,7 @@ const createProjectSync = (answers: ProjectInfo) => {
     });
     remove();
   } catch (e) {
+    log.error(e);
     log.error('配置项目信息创建失败');
   }
 
@@ -345,6 +367,7 @@ const createProjectSync = (answers: ProjectInfo) => {
         .join('\n');
       fs.writeFileSync(envPath, config);
     } catch (e) {
+      log.error(e);
       log.error('开启mock模式失败');
       log.info('请手动配置env信息');
     }
@@ -445,6 +468,7 @@ export default async () => {
     projectInfo = await getProjectInfo();
     createProjectSync(projectInfo);
   } catch (e) {
+    log.error(e);
     log.error('项目模板创建失败');
     return;
   }
