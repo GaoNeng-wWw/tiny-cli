@@ -10,14 +10,14 @@ const proxyConfig = {
     rewrite: (path: string) =>
       path.replace(
         new RegExp(`${loadEnv('', process.cwd()).VITE_BASE_API}`),
-        ''
+        '',
       ),
   },
   [loadEnv('', process.cwd()).VITE_MOCK_SERVER_HOST]: {
-    target: loadEnv('', process.cwd()).VITE_MOCK_HOST,
+    target: loadEnv('', process.cwd()).VITE_SERVER_HOST,
     changeOrigin: true,
-    rewrite: (path:string) => path.replace(/^\/mock/, '')
-  }
+    rewrite: (path: string) => path.replace(/^\/mock/, '/mock'),
+  },
 };
 export default mergeConfig(
   {
@@ -38,5 +38,5 @@ export default mergeConfig(
       }),
     ],
   },
-  baseConfig
+  baseConfig,
 );
