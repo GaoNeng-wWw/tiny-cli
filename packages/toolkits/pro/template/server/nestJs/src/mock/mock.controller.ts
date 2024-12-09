@@ -17,7 +17,6 @@ import data from './data';
 export class MockController {
   constructor(private readonly mockService: MockService) {}
 
-  @Public()
   @Get('*')
   async getMock(@Req() req: Request) {
     const path = req.path.replace('/mock', '');
@@ -30,7 +29,6 @@ export class MockController {
     return item[0].response({ body: null });
   }
 
-  @Public()
   @Post('*')
   async postMock(@Req() req: Request) {
     const path = req.path.replace('/mock', '');
