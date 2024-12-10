@@ -53,11 +53,11 @@ const config = {
         },
       },
       {
-        context: [process.env.VITE_MOCK_SERVER_HOST],
-        target: process.env.VITE_MOCK_HOST,
+        context: ['/mock'],
+        target: process.env.VITE_SERVER_HOST,
         changeOrigin: true,
         pathRewrite: {
-          '^/mock': '',
+          '^/mock': '/mock',
         },
       },
     ],

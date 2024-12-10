@@ -45,9 +45,9 @@ export default defineConfig({
           return Boolean(pathname.match('^/mock'));
         },
         pathRewrite: {
-          '^/mock': '',
+          '^/mock': '/mock',
         },
-        target: 'http://localhost:8848',
+        target: 'http://localhost:3000',
         logger: console,
       },
       '/api': {

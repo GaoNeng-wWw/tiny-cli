@@ -32,6 +32,7 @@ import {
   HeaderResolver,
   I18nModule,
 } from 'nestjs-i18n';
+import { MockModule } from './mock/mock.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import {
       resolvers: [new HeaderResolver(['x-lang'])],
       typesOutputPath: join(__dirname, '../src/.generate/i18n.generated.ts'),
     }),
+    MockModule,
   ],
   providers: [
     {
